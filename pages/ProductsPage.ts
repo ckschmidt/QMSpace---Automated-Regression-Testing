@@ -1,32 +1,37 @@
 import type { Page, Locator } from '@playwright/test';
 import { IntendedProductForm } from './IntendedProductForm.js';
 
+/**
+ * Page object for the Products listing page. Acts as the entry point into
+ * the Intended Product creation workflow.
+ */
 export class ProductsPage {
+  static readonly URL = 'https://auto.qmsgpt.net/products';
+
   readonly page: Page;
-  readonly productsNavLink: Locator;
+
+  /** Toolbar button that opens the "Intended Product" creation modal. */
   readonly intendedProductButton: Locator;
-  readonly productExpandButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.productsNavLink = this.page.getByRole('link', { name: 'Products' });
-    this.intendedProductButton = this.page.getByRole('button', { name: 'Intended Product' });
-    this.productExpandButton = this.page
-      .getByRole('cell', { name: 'expand row Automated' })
-      .getByLabel('expand row');
+    this.intendedProductButton = page.getByRole('button', { name: 'Intended Product' });
   }
 
+  /** Navigates the browser to the Products listing page. */
   async goto(): Promise<void> {
-    await this.productsNavLink.click();
+    await this.page.goto(ProductsPage.URL);
   }
 
+  /**
+   * Opens the "Intended Product" creation form and returns its page object,
+   * so callers can drive the workflow in one chained block without a second
+   * instantiation at the call site.
+   */
   async openIntendedProductForm(): Promise<IntendedProductForm> {
     await this.intendedProductButton.click();
-    return new IntendedProductForm(this.page);
-  }
-
-  async selectProduct(productName: string): Promise<void> {
-    await this.productExpandButton.click();
-    await this.page.getByText(productName, { exact: true }).click();
+    const form = new IntendedProductForm(this.page);
+    await form.expectLoaded();
+    return form;
   }
 }

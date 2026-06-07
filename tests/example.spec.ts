@@ -17,3 +17,7 @@
 //   await expect(page.getByRole('heading', { name: 'Installation' })).toBeVisible();
 // });
 
+// Refactored Page Object Models / tests now live at:
+//   - pages/LoginPage.ts            tests/login.spec.ts
+//   - pages/ProductsPage.ts         tests/intended-product.spec.ts
+//   - pages/IntendedProductForm.ts
