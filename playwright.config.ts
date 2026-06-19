@@ -10,6 +10,14 @@ import { STORAGE_STATE } from './tests/auth-storage.js';
 // dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 /**
+ * Specs routed to the per-browser `-products` projects rather than the main
+ * browser project. The match-on-one-side / ignore-on-the-other split needs a
+ * single source of truth, otherwise the two regexes can silently drift apart
+ * and a spec would either run in both phases or neither.
+ */
+const PRODUCT_CREATION_SPEC = /intended-product\.spec\.ts/;
+
+/**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
@@ -43,22 +51,61 @@ export default defineConfig({
       testMatch: /.*\.setup\.ts/,
     },
 
+    /* For each browser, a two-phase split:
+     *
+     *   `${browser}-products` — runs intended-product.spec.ts only. Creates
+     *                           the baseline products and persists their
+     *                           exact names to
+     *                           playwright/.auth/products-${browser}.json
+     *                           via tests/created-products.ts.
+     *
+     *   `${browser}`          — runs every OTHER spec (login, productnav,
+     *                           future workflows). Depends on the matching
+     *                           `${browser}-products` project so the
+     *                           baseline products are guaranteed to exist
+     *                           and be addressable by name before any of
+     *                           these tests run.
+     *
+     * The dependency chain is therefore: setup → ${browser}-products →
+     * ${browser}.
+     */
+    {
+      name: 'chromium-products',
+      use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },
+      testMatch: PRODUCT_CREATION_SPEC,
+      dependencies: ['setup'],
+    },
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },
-      dependencies: ['setup'],
+      testIgnore: PRODUCT_CREATION_SPEC,
+      dependencies: ['chromium-products'],
     },
 
+    {
+      name: 'firefox-products',
+      use: { ...devices['Desktop Firefox'], storageState: STORAGE_STATE },
+      testMatch: PRODUCT_CREATION_SPEC,
+      dependencies: ['setup'],
+    },
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'], storageState: STORAGE_STATE },
-      dependencies: ['setup'],
+      testIgnore: PRODUCT_CREATION_SPEC,
+      dependencies: ['firefox-products'],
     },
 
     {
+      name: 'webkit-products',
+      use: { ...devices['Desktop Safari'], storageState: STORAGE_STATE },
+      testMatch: PRODUCT_CREATION_SPEC,
+      dependencies: ['setup'],
+    },
+    {
       name: 'webkit',
       use: { ...devices['Desktop Safari'], storageState: STORAGE_STATE },
-      dependencies: ['setup'],
+      testIgnore: PRODUCT_CREATION_SPEC,
+      dependencies: ['webkit-products'],
     },
 
     /* Test against mobile viewports. */

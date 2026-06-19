@@ -1,11 +1,19 @@
 import { test, expect } from '@playwright/test';
 import { ProductsPage } from '../pages/ProductsPage.js';
 import type { IntendedProductInput } from '../pages/IntendedProductForm.js';
+import { browserKey, recordCreatedProduct } from './created-products.js';
 
 /**
  * Auth is provided by the `setup` project (tests/auth.setup.ts) via the
  * `storageState` loaded for the chromium/firefox/webkit projects in
  * playwright.config.ts — no per-test sign-in is needed here.
+ *
+ * This spec runs under the per-browser `${browser}-products` projects
+ * (playwright.config.ts), which the matching `${browser}` projects depend
+ * on. In addition to verifying the create/delete flows, the create tests
+ * record their products' exact names into playwright/.auth/ via
+ * [[recordCreatedProduct]] so downstream specs can address them without
+ * guessing the `Date.now()` suffix.
  */
 
 test.use({
@@ -19,14 +27,14 @@ test.use({
  * letter of each word in the name plus the first three digits of the
  * timestamp, so two browsers running in parallel with names starting
  * `Test Product w/...` both get `TP...` codes and collide on the 403
- * "duplicate code" check. Prefixing the name with the project name
+ * "duplicate code" check. Prefixing the name with the browser identifier
  * (chromium/firefox/webkit) makes the leading letter differ, which makes
  * the auto-code differ too.
  */
-function buildProduct(projectName: string): IntendedProductInput {
+function buildProduct(browser: string): IntendedProductInput {
   return {
     parentFolder: 'Automated Regression Test',
-    name: `${projectName} Test Product w/o Batch ${Date.now()}`,
+    name: `${browser} Test Product w/o Batch ${Date.now()}`,
     description: 'Test Description',
     category: 'Device Technologies *',
     template: 'PFS or Auto Injector (none software) - V3.0',
@@ -39,13 +47,13 @@ function buildProduct(projectName: string): IntendedProductInput {
  * enables the batch radio, then walks Design Controls + Risk Management with
  * Select All, plus Index File Management with its single deliverable.
  *
- * Project-name prefix exists for the same reason as `buildProduct` — avoid
- * the parallel-browser auto-code collision on `/api/saas/product`.
+ * Browser prefix exists for the same reason as `buildProduct` — avoid the
+ * parallel-browser auto-code collision on `/api/saas/product`.
  */
-function buildBatchProduct(projectName: string): IntendedProductInput {
+function buildBatchProduct(browser: string): IntendedProductInput {
   return {
     parentFolder: 'Automated Regression Test',
-    name: `${projectName} Test Product w/ Batch ${Date.now()}`,
+    name: `${browser} Test Product w/ Batch ${Date.now()}`,
     category: 'Device Technologies *',
     template: 'PFS or Auto Injector (none software) - V3.0',
     lifeCycle: 'General Product Life Cycle',
@@ -86,7 +94,7 @@ test.describe('Intended Product creation', () => {
     await productsPage.goto();
     const form = await productsPage.openIntendedProductForm();
 
-    const product = buildProduct(testInfo.project.name);
+    const product = buildProduct(browserKey(testInfo.project.name));
     await form.createProduct(product);
 
     // Business rule: a successful Create dismisses the modal — the Create
@@ -105,6 +113,10 @@ test.describe('Intended Product creation', () => {
     await productsPage.goto();
     await productsPage.searchProducts(product.name);
     await expect(productsPage.productRow(product.name)).toBeVisible();
+
+    // Persist the exact name so downstream specs can open this specific
+    // product (not just any historical product with the same prefix).
+    recordCreatedProduct(testInfo, 'simple', product.name);
   });
 
   test('user creates an Intended Product with batch task creation enabled', async ({
@@ -119,7 +131,7 @@ test.describe('Intended Product creation', () => {
     await productsPage.goto();
     const form = await productsPage.openIntendedProductForm();
 
-    const product = buildBatchProduct(testInfo.project.name);
+    const product = buildBatchProduct(browserKey(testInfo.project.name));
     await form.createProduct(product);
 
     // Same business rules as the basic creation flow: modal must dismiss and
@@ -131,6 +143,10 @@ test.describe('Intended Product creation', () => {
     await productsPage.goto();
     await productsPage.searchProducts(product.name);
     await expect(productsPage.productRow(product.name)).toBeVisible();
+
+    // Persist the exact name so downstream specs (e.g. productnav) can open
+    // this specific product instead of guessing the Date.now() suffix.
+    recordCreatedProduct(testInfo, 'batch', product.name);
   });
 
   test('user can delete an Intended Product they just created', async ({
@@ -144,7 +160,7 @@ test.describe('Intended Product creation', () => {
     // ── 1. Create ────────────────────────────────────────────────────────
     await productsPage.goto();
     const form = await productsPage.openIntendedProductForm();
-    const product = buildProduct(testInfo.project.name);
+    const product = buildProduct(browserKey(testInfo.project.name));
     await form.createProduct(product);
 
     // Modal dismisses → app auto-navigates to the new product's detail page.

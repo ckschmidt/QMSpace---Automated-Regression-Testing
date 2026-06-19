@@ -99,26 +99,20 @@ export class ProductsPage {
   }
 
   /**
-   * Filters the Intended Products table by `prefix` and opens the first
-   * matching product, navigating to its detail page. Used to reach a
-   * previously-created product without knowing its exact (timestamp-suffixed)
-   * name — the intended-product spec stamps `Date.now()` into every name, so
-   * downstream tests must address those products by a stable prefix instead.
+   * Filters the Intended Products table by `name` and opens the matching
+   * product, navigating to its detail page. Exact match on the product
+   * name so downstream specs reach the *specific* product they expect
+   * rather than a stale historical row that happens to share a prefix.
    *
-   * Click target is the product-name cell rather than the row itself: only
-   * the name column's text is wired with the navigation handler in the MUI
-   * table; clicking elsewhere in the row (toggle column, actions cell) does
-   * not navigate.
+   * Click target is the product-name cell rather than the row itself:
+   * only the name column's text is wired with the navigation handler in
+   * the MUI table; clicking elsewhere in the row (toggle column, actions
+   * cell) does not navigate.
    */
-  async openProductByPrefix(prefix: string): Promise<void> {
-    await this.searchProducts(prefix);
-    await this.page
-      .getByRole('table')
-      .getByRole('row')
-      .filter({ hasText: prefix })
-      .first()
-      .getByText(prefix, { exact: false })
-      .first()
+  async openProduct(name: string): Promise<void> {
+    await this.searchProducts(name);
+    await this.productRow(name)
+      .getByText(name, { exact: true })
       .click();
   }
 }

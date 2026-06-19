@@ -5,17 +5,19 @@ import {
   type ProductNavigationTab,
 } from '../pages/ProductNavigationMenu.js';
 import { ProductDeliverablesPage } from '../pages/ProductDeliverablesPage.js';
+import { getCreatedProduct } from './created-products.js';
 
 /**
  * Auth is provided by the `setup` project (tests/auth.setup.ts) via the
  * `storageState` loaded for the chromium/firefox/webkit projects in
  * playwright.config.ts — no per-test sign-in is needed here.
  *
- * This spec assumes the "with batch" Intended Product for the current browser
- * project has already been created by `tests/intended-product.spec.ts`
- * (the `user creates an Intended Product with batch task creation enabled`
- * case). It opens that product by searching the Products listing for the
- * project-name-prefixed batch product, then walks its navigation tabs.
+ * Project ordering in playwright.config.ts enforces that this spec runs
+ * after the matching `${browser}-products` project (which runs
+ * tests/intended-product.spec.ts and persists the created products to
+ * playwright/.auth/). This test reads back the batch product's exact name
+ * and opens it, so the nav-walk always exercises the freshly-created
+ * artifact (not a stale historical row matching the same prefix).
  */
 
 test.use({
@@ -45,18 +47,11 @@ test.describe('Product navigation', () => {
     // spec's headroom.
     test.setTimeout(90_000);
 
+    const batchProductName = getCreatedProduct(testInfo, 'batch');
+
     const productsPage = new ProductsPage(page);
     await productsPage.goto();
-
-    // The batch product is created with name
-    // `${projectName} Test Product w/ Batch ${Date.now()}` — opening by this
-    // prefix selects the matching product for the current browser project
-    // without needing the exact timestamp suffix. If multiple historical
-    // batch products exist for this project, the first matching row wins;
-    // the test does not care which one, only that the nav menu loads.
-    await productsPage.openProductByPrefix(
-      `${testInfo.project.name} Test Product w/ Batch`,
-    );
+    await productsPage.openProduct(batchProductName);
 
     const nav = new ProductNavigationMenu(page);
     await nav.expectLoaded();
